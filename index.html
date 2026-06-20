@@ -8,10 +8,6 @@
 <title>Voice Recorder</title>
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon-192.png" />
-<link rel="apple-touch-icon" href="icon-192.png" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Recorder" />
 <style>
   :root {
     --bg: #181610;
@@ -126,6 +122,17 @@
     display: none;
   }
 
+  .help-box {
+    background: rgba(127,169,139,0.09);
+    border: 1px solid rgba(127,169,139,0.35);
+    color: var(--cream);
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 11px 13px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+
   .transport {
     display: flex;
     justify-content: center;
@@ -227,6 +234,11 @@
     line-height: 1.5;
   }
 
+  .footnote a {
+    color: var(--cream);
+    text-decoration-color: rgba(241,234,217,0.45);
+  }
+
   @media (max-width: 360px) {
     .counter { font-size: 32px; }
     .device { padding: 18px 14px 22px; }
@@ -251,6 +263,7 @@
     <div class="status-line" id="statusLine">Ready</div>
 
     <div class="error-box" id="errorBox"></div>
+    <div class="help-box" id="helpBox">Tap record and allow microphone access when Android asks. Recordings stay on this device unless you download or share them.</div>
 
     <div class="transport">
       <button type="button" class="tbtn btn-secondary" id="pauseBtn" disabled aria-label="Pause recording"></button>
@@ -265,7 +278,7 @@
       <div id="list"></div>
     </div>
 
-    <div class="footnote">Takes are saved on this device. Download anything important before clearing browser data.</div>
+    <div class="footnote">Android PWA ready. Install from Chrome using the browser menu. <a href="privacy.html">Privacy</a></div>
   </div>
 
 <script>
@@ -285,6 +298,7 @@
   const timerEl = document.getElementById('timer');
   const statusLine = document.getElementById('statusLine');
   const errorBox = document.getElementById('errorBox');
+  const helpBox = document.getElementById('helpBox');
   const meterPanel = document.getElementById('meterPanel');
   const meterCanvas = document.getElementById('meter');
   const countLabel = document.getElementById('countLabel');
@@ -325,17 +339,17 @@
   function micErrorMessage(err) {
     const details = err && err.name ? ' Browser error: ' + err.name + '.' : '';
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      return 'This browser does not support microphone recording on this page. Open the HTTPS GitHub Pages link in Chrome, Edge, or Safari.';
+      return 'This browser does not support microphone recording on this page. Open the HTTPS app link in Chrome on Android.';
     }
     if (window.location.protocol === 'file:' && err && err.name === 'NotAllowedError') return 'Microphone access was not allowed for this file. Click Allow in the browser prompt, or reset the file permission in browser settings and try again.' + details;
     if (window.location.protocol === 'file:') return 'This browser may limit microphone access for files. For the phone version, open the app from an HTTPS website.' + details;
-    if (err && err.name === 'NotAllowedError') return 'Microphone access was blocked for this website. Open browser site settings for this page, set Microphone to Allow, then reload.' + details;
+    if (err && err.name === 'NotAllowedError') return 'Microphone access was not allowed. Tap the site settings icon beside the address, set Microphone to Allow, then reload.' + details;
     if (err && err.name === 'NotFoundError') return 'No microphone was found on this device.';
     if (err && err.name === 'NotReadableError') return 'Your microphone is already in use by another app.';
     if (err && err.name === 'SecurityError') return 'This browser blocked microphone access because the page is not trusted. Use the HTTPS GitHub Pages link.' + details;
     return 'Could not start recording. Check your microphone and try again.' + details;
   }
-  function showError(msg) { errorBox.textContent = msg; errorBox.style.display = 'block'; }
+  function showError(msg) { errorBox.textContent = msg; errorBox.style.display = 'block'; helpBox.style.display = 'none'; }
   function hideError() { errorBox.style.display = 'none'; errorBox.textContent = ''; }
   function debounce(fn, wait) { let t; return function () { clearTimeout(t); const args = arguments; t = setTimeout(function () { fn.apply(null, args); }, wait); }; }
   function openDb() {
@@ -513,6 +527,7 @@
   // ---- recording lifecycle ----
   async function startRecording() {
     hideError();
+    helpBox.style.display = 'none';
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       currentStream = stream;

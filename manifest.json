@@ -1,8 +1,8 @@
 {
   "name": "Voice Recorder",
   "short_name": "Recorder",
-  "description": "A simple voice recorder with a live level meter and a take library.",
-  "start_url": "index.html",
+  "description": "A free Android-friendly voice recorder with local device storage, playback, and downloads.",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#181610",

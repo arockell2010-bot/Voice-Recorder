@@ -1,5 +1,5 @@
-const CACHE = 'voice-recorder-v3';
-const ASSETS = ['index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'voice-recorder-v4';
+const ASSETS = ['./', 'index.html', 'privacy.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (event) {
   event.waitUntil(caches.open(CACHE).then(function (cache) { return cache.addAll(ASSETS); }));
