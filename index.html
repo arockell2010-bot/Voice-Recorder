@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#181610" />
+<title>Voice Recorder</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Recorder" />
+<style>
+  :root {
+    --bg: #181610;
+    --panel-edge: #3A3526;
+    --cream: #F1EAD9;
+    --muted: #A39A87;
+    --amber: #E2A23B;
+    --amber-dim: rgba(226,162,59,0.30);
+    --red: #D6453D;
+    --red-dim: rgba(214,69,61,0.35);
+    --sage: #7FA98B;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(ellipse at top, #201D16 0%, var(--bg) 60%);
+    color: var(--cream);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 28px 16px 60px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .device {
+    width: 100%;
+    max-width: 420px;
+    background: linear-gradient(180deg, #262217 0%, #1D1A13 100%);
+    border: 1px solid var(--panel-edge);
+    border-radius: 22px;
+    padding: 22px 20px 26px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--muted);
+    transition: background .2s, box-shadow .2s;
+  }
+  .eyebrow .dot.live {
+    background: var(--red);
+    box-shadow: 0 0 8px 2px var(--red-dim);
+    animation: blink 1.1s steps(2,start) infinite;
+  }
+  .eyebrow .dot.pause {
+    background: var(--amber);
+    box-shadow: 0 0 8px 2px var(--amber-dim);
+  }
+  @keyframes blink { 50% { opacity: .35; } }
+
+  h1 {
+    font-size: 18px;
+    margin: 0 0 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    min-height: 24px;
+  }
+
+  .meter-panel {
+    background: #100F0B;
+    border: 1px solid var(--panel-edge);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 14px;
+    transition: opacity .2s ease;
+  }
+  .meter-panel.paused { opacity: .5; }
+  canvas#meter { width: 100%; height: 64px; display: block; }
+
+  .counter {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    font-size: 38px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    margin: 4px 0 4px;
+    font-weight: 500;
+  }
+
+  .status-line {
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+    min-height: 14px;
+  }
+  .status-line.rec { color: var(--red); }
+  .status-line.pause { color: var(--amber); }
+
+  .error-box {
+    background: rgba(214,69,61,0.1);
+    border: 1px solid var(--red-dim);
+    color: var(--cream);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 12px 14px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  .transport {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 22px;
+    margin-bottom: 22px;
+  }
+
+  button.tbtn {
+    -webkit-appearance: none;
+    appearance: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cream);
+    transition: transform .12s ease, box-shadow .15s ease, background .15s ease, color .15s ease;
+  }
+  button.tbtn:active { transform: scale(0.94); }
+  button.tbtn:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+  .btn-record {
+    width: 68px; height: 68px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #E25B52, var(--red));
+    box-shadow: 0 6px 16px -4px rgba(214,69,61,0.55), inset 0 1px 1px rgba(255,255,255,0.25);
+  }
+  .btn-record.recording {
+    background: radial-gradient(circle at 35% 30%, #2A2722, #16140F);
+    box-shadow: inset 0 0 0 2px var(--red), 0 0 0 6px var(--red-dim);
+    color: var(--red);
+  }
+
+  .btn-secondary {
+    width: 50px; height: 50px; border-radius: 50%;
+    background: #2C2818;
+    border: 1px solid var(--panel-edge);
+  }
+  .btn-secondary:disabled { opacity: .35; cursor: not-allowed; }
+
+  .library {
+    border-top: 1px solid var(--panel-edge);
+    padding-top: 16px;
+  }
+  .library-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .library-header .label {
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+  }
+  .library-header .count { font-size: 12px; color: var(--muted); }
+
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 26px 14px;
+    border: 1px dashed var(--panel-edge);
+    border-radius: 10px;
+  }
+
+  .take {
+    background: #201D15;
+    border: 1px solid var(--panel-edge);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .take-info { flex: 1; min-width: 0; }
+  .take-name {
+    font-size: 14px; font-weight: 600; margin: 0 0 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .take-meta { font-size: 12px; color: var(--muted); margin: 0; }
+  .take-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: #2A2618;
+    border: 1px solid var(--panel-edge);
+    color: var(--cream);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .icon-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .icon-btn.play.active { background: var(--sage); color: #11261B; border-color: var(--sage); }
+
+  .footnote {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 18px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 360px) {
+    .counter { font-size: 32px; }
+    .device { padding: 18px 14px 22px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .eyebrow .dot.live { animation: none; }
+    button.tbtn { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="device">
+    <div class="eyebrow"><span class="dot" id="liveDot"></span><span>Voice Recorder</span></div>
+    <h1 id="mainHeading">Press record to capture a take</h1>
+
+    <div class="meter-panel" id="meterPanel">
+      <canvas id="meter"></canvas>
+    </div>
+
+    <div class="counter" id="timer">00:00</div>
+    <div class="status-line" id="statusLine">Ready</div>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <div class="transport">
+      <button type="button" class="tbtn btn-secondary" id="pauseBtn" disabled aria-label="Pause recording"></button>
+      <button type="button" class="tbtn btn-record" id="recordBtn" aria-label="Start recording"></button>
+    </div>
+
+    <div class="library">
+      <div class="library-header">
+        <span class="label">Recordings</span>
+        <span class="count" id="countLabel">0 takes</span>
+      </div>
+      <div id="list"></div>
+    </div>
+
+    <div class="footnote">Takes are saved on this device. Download anything important before clearing browser data.</div>
+  </div>
+
+<script>
+  // ---- icons ----
+  const stopIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+  const pauseIcon18 = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>';
+  const playIcon18 = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>';
+  const playIconSmall = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>';
+  const pauseIconSmall = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/></svg>';
+  const downloadIcon = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>';
+  const trashIcon = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M7 7l1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg>';
+
+  // ---- DOM refs ----
+  const recordBtn = document.getElementById('recordBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const liveDot = document.getElementById('liveDot');
+  const timerEl = document.getElementById('timer');
+  const statusLine = document.getElementById('statusLine');
+  const errorBox = document.getElementById('errorBox');
+  const meterPanel = document.getElementById('meterPanel');
+  const meterCanvas = document.getElementById('meter');
+  const countLabel = document.getElementById('countLabel');
+  const listEl = document.getElementById('list');
+  const mainHeading = document.getElementById('mainHeading');
+
+  // ---- state ----
+  let audioCtx = null, analyser = null, dataArray = null;
+  let currentStream = null, currentSource = null;
+  let mediaRecorder = null, chunks = [], chosenMime = '';
+  let isRecording = false, isPaused = false;
+  let segmentStart = 0, accumulatedMs = 0;
+  let rafId = null, idleRafId = null, idlePhase = 0;
+  let takeCounter = 0;
+  let recordings = [];
+  let meterCtx = null, meterW = 0, meterH = 0;
+  let activeAudio = null, activeBtn = null, activeId = null;
+  const DB_NAME = 'voice-recorder-db';
+  const DB_VERSION = 1;
+  const STORE_NAME = 'recordings';
+
+  // ---- helpers ----
+  function formatTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+    const s = (totalSec % 60).toString().padStart(2, '0');
+    return m + ':' + s;
+  }
+  function formatClock(d) {
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  function extForMime(mime) {
+    if (mime.includes('webm')) return 'webm';
+    if (mime.includes('mp4')) return 'm4a';
+    if (mime.includes('ogg')) return 'ogg';
+    return 'webm';
+  }
+  function micErrorMessage(err) {
+    if (window.location.protocol === 'file:' && err && err.name === 'NotAllowedError') return 'Microphone access was not allowed for this file. Click Allow in the browser prompt, or reset the file permission in browser settings and try again.';
+    if (window.location.protocol === 'file:') return 'This browser may limit microphone access for files. For the phone version, open the app from an HTTPS website.';
+    if (err && err.name === 'NotAllowedError') return 'Microphone access was blocked. Allow microphone permission for this page in your browser settings, then try again.';
+    if (err && err.name === 'NotFoundError') return 'No microphone was found on this device.';
+    if (err && err.name === 'NotReadableError') return 'Your microphone is already in use by another app.';
+    return 'Could not start recording. Check your microphone and try again.';
+  }
+  function showError(msg) { errorBox.textContent = msg; errorBox.style.display = 'block'; }
+  function hideError() { errorBox.style.display = 'none'; errorBox.textContent = ''; }
+  function debounce(fn, wait) { let t; return function () { clearTimeout(t); const args = arguments; t = setTimeout(function () { fn.apply(null, args); }, wait); }; }
+  function openDb() {
+    return new Promise(function (resolve, reject) {
+      if (!('indexedDB' in window)) {
+        reject(new Error('IndexedDB is not available.'));
+        return;
+      }
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function () {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+  async function loadSavedRecordings() {
+    try {
+      const db = await openDb();
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).getAll();
+      req.onsuccess = function () {
+        recordings.forEach(function (rec) { URL.revokeObjectURL(rec.url); });
+        recordings = req.result
+          .map(function (item) {
+            return {
+              id: item.id,
+              url: URL.createObjectURL(item.blob),
+              blob: item.blob,
+              name: item.name,
+              duration: item.duration,
+              createdAt: new Date(item.createdAt),
+              ext: item.ext
+            };
+          })
+          .sort(function (a, b) { return b.createdAt - a.createdAt; });
+        takeCounter = recordings.length;
+        renderList();
+      };
+    } catch (err) {
+      showError('This browser cannot save recordings between visits. You can still record and download takes.');
+    }
+  }
+  async function saveRecording(rec) {
+    try {
+      const db = await openDb();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put({
+        id: rec.id,
+        blob: rec.blob,
+        name: rec.name,
+        duration: rec.duration,
+        createdAt: rec.createdAt.toISOString(),
+        ext: rec.ext
+      });
+    } catch (err) {
+      showError('This take was recorded, but it could not be saved for later.');
+    }
+  }
+  async function deleteSavedRecording(id) {
+    try {
+      const db = await openDb();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(id);
+    } catch (err) {}
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  // ---- canvas / meter ----
+  function setupMeterCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = meterCanvas.getBoundingClientRect();
+    meterW = rect.width;
+    meterH = rect.height;
+    meterCanvas.width = meterW * dpr;
+    meterCanvas.height = meterH * dpr;
+    meterCtx = meterCanvas.getContext('2d');
+    meterCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawBars(getHeight, color, glow) {
+    meterCtx.clearRect(0, 0, meterW, meterH);
+    const barCount = 26;
+    const gap = 3;
+    const barWidth = (meterW - gap * (barCount - 1)) / barCount;
+    meterCtx.fillStyle = color;
+    if (glow) { meterCtx.shadowColor = glow; meterCtx.shadowBlur = 6; } else { meterCtx.shadowBlur = 0; }
+    for (let i = 0; i < barCount; i++) {
+      const h = getHeight(i, barCount);
+      const x = i * (barWidth + gap);
+      const y = meterH - h;
+      roundRect(meterCtx, x, y, barWidth, h, 2);
+      meterCtx.fill();
+    }
+  }
+
+  function drawActive() {
+    analyser.getByteFrequencyData(dataArray);
+    const barCount = 26;
+    const step = Math.max(1, Math.floor(dataArray.length / barCount));
+    drawBars(function (i) {
+      let sum = 0;
+      for (let j = 0; j < step; j++) { sum += dataArray[i * step + j] || 0; }
+      const avg = sum / step;
+      return Math.max(3, (avg / 255) * meterH);
+    }, '#E2A23B', 'rgba(226,162,59,0.55)');
+
+    const elapsed = accumulatedMs + (isPaused ? 0 : Date.now() - segmentStart);
+    timerEl.textContent = formatTime(elapsed);
+
+    rafId = requestAnimationFrame(drawActive);
+  }
+
+  function drawIdle() {
+    idlePhase += 0.04;
+    drawBars(function (i) {
+      return 4 + Math.abs(Math.sin(idlePhase + i * 0.35)) * (meterH * 0.18);
+    }, 'rgba(226,162,59,0.28)', null);
+    idleRafId = requestAnimationFrame(drawIdle);
+  }
+
+  // ---- UI state ----
+  function updateTransportUI(state) {
+    if (state === 'idle') {
+      recordBtn.classList.remove('recording');
+      recordBtn.innerHTML = '';
+      recordBtn.setAttribute('aria-label', 'Start recording');
+      pauseBtn.disabled = true;
+      pauseBtn.innerHTML = pauseIcon18;
+      pauseBtn.setAttribute('aria-label', 'Pause recording');
+      liveDot.classList.remove('live', 'pause');
+      statusLine.textContent = 'Ready';
+      statusLine.className = 'status-line';
+      mainHeading.textContent = 'Press record to capture a take';
+    } else if (state === 'recording') {
+      recordBtn.classList.add('recording');
+      recordBtn.innerHTML = stopIcon;
+      recordBtn.setAttribute('aria-label', 'Stop recording');
+      pauseBtn.disabled = false;
+      pauseBtn.innerHTML = pauseIcon18;
+      pauseBtn.setAttribute('aria-label', 'Pause recording');
+      liveDot.classList.add('live'); liveDot.classList.remove('pause');
+      statusLine.textContent = 'Recording';
+      statusLine.className = 'status-line rec';
+      mainHeading.textContent = 'Recording...';
+    } else if (state === 'paused') {
+      recordBtn.classList.add('recording');
+      recordBtn.innerHTML = stopIcon;
+      recordBtn.setAttribute('aria-label', 'Stop recording');
+      pauseBtn.disabled = false;
+      pauseBtn.innerHTML = playIcon18;
+      pauseBtn.setAttribute('aria-label', 'Resume recording');
+      liveDot.classList.remove('live'); liveDot.classList.add('pause');
+      statusLine.textContent = 'Paused';
+      statusLine.className = 'status-line pause';
+      mainHeading.textContent = 'Paused - resume anytime';
+    }
+  }
+
+  // ---- recording lifecycle ----
+  async function startRecording() {
+    hideError();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      currentStream = stream;
+      if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+      if (audioCtx.state === 'suspended') { await audioCtx.resume(); }
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 128;
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
+      source.connect(analyser);
+      currentSource = source;
+
+      const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+      chosenMime = candidates.find(function (t) { return window.MediaRecorder && MediaRecorder.isTypeSupported(t); }) || '';
+      mediaRecorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime }) : new MediaRecorder(stream);
+      chunks = [];
+      mediaRecorder.addEventListener('dataavailable', function (e) { if (e.data && e.data.size > 0) chunks.push(e.data); });
+      mediaRecorder.addEventListener('stop', onRecordingStop);
+      mediaRecorder.start();
+
+      isRecording = true; isPaused = false;
+      segmentStart = Date.now(); accumulatedMs = 0;
+      cancelAnimationFrame(idleRafId);
+      rafId = requestAnimationFrame(drawActive);
+      updateTransportUI('recording');
+    } catch (err) {
+      showError(micErrorMessage(err));
+    }
+  }
+
+  function pauseRecording() {
+    if (!isRecording || isPaused) return;
+    mediaRecorder.pause();
+    accumulatedMs += Date.now() - segmentStart;
+    isPaused = true;
+    cancelAnimationFrame(rafId);
+    meterPanel.classList.add('paused');
+    updateTransportUI('paused');
+  }
+
+  function resumeRecording() {
+    if (!isRecording || !isPaused) return;
+    mediaRecorder.resume();
+    segmentStart = Date.now();
+    isPaused = false;
+    meterPanel.classList.remove('paused');
+    rafId = requestAnimationFrame(drawActive);
+    updateTransportUI('recording');
+  }
+
+  function stopRecording() {
+    if (!isRecording) return;
+    if (!isPaused) { accumulatedMs += Date.now() - segmentStart; }
+    mediaRecorder.stop();
+  }
+
+  function onRecordingStop() {
+    const mimeForBlob = chosenMime ? chosenMime.split(';')[0] : 'audio/webm';
+    const blob = new Blob(chunks, { type: mimeForBlob });
+    const url = URL.createObjectURL(blob);
+    takeCounter += 1;
+    const rec = {
+      id: 'rec_' + Date.now() + '_' + takeCounter,
+      url: url,
+      name: 'Take ' + String(takeCounter).padStart(2, '0'),
+      duration: accumulatedMs,
+      blob: blob,
+      createdAt: new Date(),
+      ext: extForMime(mimeForBlob)
+    };
+    recordings.unshift(rec);
+    renderList();
+    saveRecording(rec);
+
+    if (currentStream) { currentStream.getTracks().forEach(function (t) { t.stop(); }); currentStream = null; }
+    if (currentSource) { currentSource.disconnect(); currentSource = null; }
+    analyser = null;
+
+    isRecording = false; isPaused = false;
+    cancelAnimationFrame(rafId);
+    meterPanel.classList.remove('paused');
+    idleRafId = requestAnimationFrame(drawIdle);
+    timerEl.textContent = '00:00';
+    updateTransportUI('idle');
+  }
+
+  // ---- library list ----
+  function renderList() {
+    countLabel.textContent = recordings.length === 1 ? '1 take' : recordings.length + ' takes';
+    if (recordings.length === 0) {
+      listEl.innerHTML = '<div class="empty">No takes yet. Recordings you make will appear here for playback and download.</div>';
+      return;
+    }
+    listEl.innerHTML = recordings.map(function (rec) {
+      const isActive = activeId === rec.id && activeAudio && !activeAudio.paused;
+      return '' +
+        '<div class="take" data-id="' + rec.id + '">' +
+          '<button type="button" class="icon-btn play' + (isActive ? ' active' : '') + '" data-action="play" aria-label="Play ' + rec.name + '">' + (isActive ? pauseIconSmall : playIconSmall) + '</button>' +
+          '<div class="take-info">' +
+            '<p class="take-name">' + rec.name + '</p>' +
+            '<p class="take-meta">' + formatTime(rec.duration) + ' \u00B7 ' + formatClock(rec.createdAt) + '</p>' +
+          '</div>' +
+          '<div class="take-actions">' +
+            '<button type="button" class="icon-btn" data-action="download" aria-label="Download ' + rec.name + '">' + downloadIcon + '</button>' +
+            '<button type="button" class="icon-btn" data-action="delete" aria-label="Delete ' + rec.name + '">' + trashIcon + '</button>' +
+          '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function togglePlay(rec, btn) {
+    if (activeId === rec.id && activeAudio) {
+      if (activeAudio.paused) { activeAudio.play(); btn.innerHTML = pauseIconSmall; btn.classList.add('active'); }
+      else { activeAudio.pause(); btn.innerHTML = playIconSmall; btn.classList.remove('active'); }
+      return;
+    }
+    if (activeAudio) {
+      activeAudio.pause();
+      if (activeBtn) { activeBtn.innerHTML = playIconSmall; activeBtn.classList.remove('active'); }
+    }
+    activeAudio = new Audio(rec.url);
+    activeBtn = btn; activeId = rec.id;
+    activeAudio.addEventListener('ended', function () {
+      btn.innerHTML = playIconSmall; btn.classList.remove('active'); activeId = null;
+    });
+    activeAudio.play();
+    btn.innerHTML = pauseIconSmall; btn.classList.add('active');
+  }
+
+  function downloadRecording(rec) {
+    const a = document.createElement('a');
+    a.href = rec.url;
+    a.download = rec.name.replace(/\s+/g, '_') + '.' + rec.ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function deleteRecording(id) {
+    const idx = recordings.findIndex(function (r) { return r.id === id; });
+    if (idx === -1) return;
+    if (activeId === id && activeAudio) { activeAudio.pause(); activeAudio = null; activeBtn = null; activeId = null; }
+    URL.revokeObjectURL(recordings[idx].url);
+    deleteSavedRecording(id);
+    recordings.splice(idx, 1);
+    renderList();
+  }
+
+  listEl.addEventListener('click', function (e) {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const takeEl = btn.closest('.take');
+    const id = takeEl.getAttribute('data-id');
+    const rec = recordings.find(function (r) { return r.id === id; });
+    if (!rec) return;
+    const action = btn.getAttribute('data-action');
+    if (action === 'play') togglePlay(rec, btn);
+    else if (action === 'download') downloadRecording(rec);
+    else if (action === 'delete') deleteRecording(rec.id);
+  });
+
+  recordBtn.addEventListener('click', function () {
+    if (!isRecording) startRecording(); else stopRecording();
+  });
+  pauseBtn.addEventListener('click', function () {
+    if (isPaused) resumeRecording(); else pauseRecording();
+  });
+
+  window.addEventListener('resize', debounce(setupMeterCanvas, 200));
+
+  // ---- init ----
+  setupMeterCanvas();
+  idleRafId = requestAnimationFrame(drawIdle);
+  updateTransportUI('idle');
+  renderList();
+  loadSavedRecordings();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+</script>
+</body>
+</html>
