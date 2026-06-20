@@ -2,7 +2,8 @@ Voice Recorder App
 
 This is a free Android-friendly Progressive Web App. It records audio, shows
 a live meter, saves recordings on the device, and lets you play, download, or
-delete takes.
+delete takes. Recordings can be organized into folders such as Quick Ideas,
+Work, Personal Notes, and Archive.
 
 How to use it on Android:
 
@@ -17,6 +18,8 @@ Important:
 
 - Microphone recording requires HTTPS, except while testing on localhost.
 - Recordings are stored in the browser/app storage on that device.
+- The folder picker organizes recordings inside the app.
+- The download button exports a copy to the phone's downloads area.
 - Download important recordings before clearing browser data or removing the app.
 - The app does not upload recordings or send audio to a server.
 - Each new device/browser will ask for microphone permission once.

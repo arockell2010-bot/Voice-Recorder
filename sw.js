@@ -1,4 +1,4 @@
-const CACHE = 'voice-recorder-v4';
+const CACHE = 'voice-recorder-v5';
 const ASSETS = ['./', 'index.html', 'privacy.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (event) {

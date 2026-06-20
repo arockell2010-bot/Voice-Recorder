@@ -133,6 +133,28 @@
     margin-bottom: 16px;
   }
 
+  .folder-panel {
+    margin: -2px 0 16px;
+  }
+  .folder-label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .folder-select {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-edge);
+    background: #201D15;
+    color: var(--cream);
+    font-size: 15px;
+    padding: 0 12px;
+  }
+
   .transport {
     display: flex;
     justify-content: center;
@@ -186,6 +208,33 @@
   }
   .library-header .count { font-size: 12px; color: var(--muted); }
 
+  .folder-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 1px 0 12px;
+    scrollbar-width: none;
+  }
+  .folder-tabs::-webkit-scrollbar { display: none; }
+  .folder-tab {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 1px solid var(--panel-edge);
+    background: #201D15;
+    color: var(--muted);
+    border-radius: 999px;
+    min-height: 36px;
+    padding: 0 13px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .folder-tab.active {
+    color: #11261B;
+    background: var(--sage);
+    border-color: var(--sage);
+  }
+
   .empty {
     text-align: center;
     color: var(--muted);
@@ -212,7 +261,23 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .take-meta { font-size: 12px; color: var(--muted); margin: 0; }
+  .take-folder {
+    display: inline-block;
+    color: var(--cream);
+  }
   .take-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  .folder-move {
+    width: 100%;
+    margin-top: 7px;
+    border-radius: 8px;
+    border: 1px solid var(--panel-edge);
+    background: #17140F;
+    color: var(--cream);
+    min-height: 32px;
+    font-size: 12px;
+    padding: 0 8px;
+  }
 
   .icon-btn {
     width: 38px; height: 38px; border-radius: 50%;
@@ -265,6 +330,16 @@
     <div class="error-box" id="errorBox"></div>
     <div class="help-box" id="helpBox">Tap record and allow microphone access when Android asks. Recordings stay on this device unless you download or share them.</div>
 
+    <div class="folder-panel">
+      <label class="folder-label" for="folderSelect">Save new recording to</label>
+      <select class="folder-select" id="folderSelect">
+        <option value="quick">Quick Ideas</option>
+        <option value="work">Work</option>
+        <option value="personal">Personal Notes</option>
+        <option value="archive">Archive</option>
+      </select>
+    </div>
+
     <div class="transport">
       <button type="button" class="tbtn btn-secondary" id="pauseBtn" disabled aria-label="Pause recording"></button>
       <button type="button" class="tbtn btn-record" id="recordBtn" aria-label="Start recording"></button>
@@ -275,6 +350,7 @@
         <span class="label">Recordings</span>
         <span class="count" id="countLabel">0 takes</span>
       </div>
+      <div class="folder-tabs" id="folderTabs"></div>
       <div id="list"></div>
     </div>
 
@@ -304,6 +380,8 @@
   const countLabel = document.getElementById('countLabel');
   const listEl = document.getElementById('list');
   const mainHeading = document.getElementById('mainHeading');
+  const folderSelect = document.getElementById('folderSelect');
+  const folderTabs = document.getElementById('folderTabs');
 
   // ---- state ----
   let audioCtx = null, analyser = null, dataArray = null;
@@ -314,11 +392,19 @@
   let rafId = null, idleRafId = null, idlePhase = 0;
   let takeCounter = 0;
   let recordings = [];
+  let activeFolder = 'all';
   let meterCtx = null, meterW = 0, meterH = 0;
   let activeAudio = null, activeBtn = null, activeId = null;
   const DB_NAME = 'voice-recorder-db';
   const DB_VERSION = 1;
   const STORE_NAME = 'recordings';
+  const FOLDERS = [
+    { id: 'all', label: 'All' },
+    { id: 'quick', label: 'Quick Ideas' },
+    { id: 'work', label: 'Work' },
+    { id: 'personal', label: 'Personal Notes' },
+    { id: 'archive', label: 'Archive' }
+  ];
 
   // ---- helpers ----
   function formatTime(ms) {
@@ -329,6 +415,10 @@
   }
   function formatClock(d) {
     return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  function folderLabel(id) {
+    const folder = FOLDERS.find(function (f) { return f.id === id; });
+    return folder ? folder.label : 'Quick Ideas';
   }
   function extForMime(mime) {
     if (mime.includes('webm')) return 'webm';
@@ -384,6 +474,7 @@
               blob: item.blob,
               name: item.name,
               duration: item.duration,
+              folder: item.folder || 'quick',
               createdAt: new Date(item.createdAt),
               ext: item.ext
             };
@@ -405,6 +496,7 @@
         blob: rec.blob,
         name: rec.name,
         duration: rec.duration,
+        folder: rec.folder || 'quick',
         createdAt: rec.createdAt.toISOString(),
         ext: rec.ext
       });
@@ -595,6 +687,7 @@
       name: 'Take ' + String(takeCounter).padStart(2, '0'),
       duration: accumulatedMs,
       blob: blob,
+      folder: folderSelect.value,
       createdAt: new Date(),
       ext: extForMime(mimeForBlob)
     };
@@ -615,20 +708,44 @@
   }
 
   // ---- library list ----
+  function renderFolderTabs() {
+    folderTabs.innerHTML = FOLDERS.map(function (folder) {
+      const count = folder.id === 'all'
+        ? recordings.length
+        : recordings.filter(function (rec) { return (rec.folder || 'quick') === folder.id; }).length;
+      return '<button type="button" class="folder-tab' + (activeFolder === folder.id ? ' active' : '') + '" data-folder="' + folder.id + '">' +
+        folder.label + ' (' + count + ')' +
+      '</button>';
+    }).join('');
+  }
+
   function renderList() {
+    const visibleRecordings = activeFolder === 'all'
+      ? recordings
+      : recordings.filter(function (rec) { return (rec.folder || 'quick') === activeFolder; });
     countLabel.textContent = recordings.length === 1 ? '1 take' : recordings.length + ' takes';
+    renderFolderTabs();
     if (recordings.length === 0) {
-      listEl.innerHTML = '<div class="empty">No takes yet. Recordings you make will appear here for playback and download.</div>';
+      listEl.innerHTML = '<div class="empty">No takes yet. Pick a folder, record a note, then play or download it here.</div>';
       return;
     }
-    listEl.innerHTML = recordings.map(function (rec) {
+    if (visibleRecordings.length === 0) {
+      listEl.innerHTML = '<div class="empty">No recordings in ' + folderLabel(activeFolder) + ' yet.</div>';
+      return;
+    }
+    listEl.innerHTML = visibleRecordings.map(function (rec) {
       const isActive = activeId === rec.id && activeAudio && !activeAudio.paused;
       return '' +
         '<div class="take" data-id="' + rec.id + '">' +
           '<button type="button" class="icon-btn play' + (isActive ? ' active' : '') + '" data-action="play" aria-label="Play ' + rec.name + '">' + (isActive ? pauseIconSmall : playIconSmall) + '</button>' +
           '<div class="take-info">' +
             '<p class="take-name">' + rec.name + '</p>' +
-            '<p class="take-meta">' + formatTime(rec.duration) + ' \u00B7 ' + formatClock(rec.createdAt) + '</p>' +
+            '<p class="take-meta"><span class="take-folder">' + folderLabel(rec.folder || 'quick') + '</span> \u00B7 ' + formatTime(rec.duration) + ' \u00B7 ' + formatClock(rec.createdAt) + '</p>' +
+            '<select class="folder-move" data-action="move" aria-label="Move ' + rec.name + '">' +
+              FOLDERS.filter(function (folder) { return folder.id !== 'all'; }).map(function (folder) {
+                return '<option value="' + folder.id + '"' + ((rec.folder || 'quick') === folder.id ? ' selected' : '') + '>' + folder.label + '</option>';
+              }).join('') +
+            '</select>' +
           '</div>' +
           '<div class="take-actions">' +
             '<button type="button" class="icon-btn" data-action="download" aria-label="Download ' + rec.name + '">' + downloadIcon + '</button>' +
@@ -687,6 +804,25 @@
     if (action === 'play') togglePlay(rec, btn);
     else if (action === 'download') downloadRecording(rec);
     else if (action === 'delete') deleteRecording(rec.id);
+  });
+
+  listEl.addEventListener('change', function (e) {
+    const select = e.target.closest('select[data-action="move"]');
+    if (!select) return;
+    const takeEl = select.closest('.take');
+    const id = takeEl.getAttribute('data-id');
+    const rec = recordings.find(function (r) { return r.id === id; });
+    if (!rec) return;
+    rec.folder = select.value;
+    saveRecording(rec);
+    renderList();
+  });
+
+  folderTabs.addEventListener('click', function (e) {
+    const btn = e.target.closest('button[data-folder]');
+    if (!btn) return;
+    activeFolder = btn.getAttribute('data-folder');
+    renderList();
   });
 
   recordBtn.addEventListener('click', function () {
