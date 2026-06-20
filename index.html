@@ -323,12 +323,17 @@
     return 'webm';
   }
   function micErrorMessage(err) {
-    if (window.location.protocol === 'file:' && err && err.name === 'NotAllowedError') return 'Microphone access was not allowed for this file. Click Allow in the browser prompt, or reset the file permission in browser settings and try again.';
-    if (window.location.protocol === 'file:') return 'This browser may limit microphone access for files. For the phone version, open the app from an HTTPS website.';
-    if (err && err.name === 'NotAllowedError') return 'Microphone access was blocked. Allow microphone permission for this page in your browser settings, then try again.';
+    const details = err && err.name ? ' Browser error: ' + err.name + '.' : '';
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return 'This browser does not support microphone recording on this page. Open the HTTPS GitHub Pages link in Chrome, Edge, or Safari.';
+    }
+    if (window.location.protocol === 'file:' && err && err.name === 'NotAllowedError') return 'Microphone access was not allowed for this file. Click Allow in the browser prompt, or reset the file permission in browser settings and try again.' + details;
+    if (window.location.protocol === 'file:') return 'This browser may limit microphone access for files. For the phone version, open the app from an HTTPS website.' + details;
+    if (err && err.name === 'NotAllowedError') return 'Microphone access was blocked for this website. Open browser site settings for this page, set Microphone to Allow, then reload.' + details;
     if (err && err.name === 'NotFoundError') return 'No microphone was found on this device.';
     if (err && err.name === 'NotReadableError') return 'Your microphone is already in use by another app.';
-    return 'Could not start recording. Check your microphone and try again.';
+    if (err && err.name === 'SecurityError') return 'This browser blocked microphone access because the page is not trusted. Use the HTTPS GitHub Pages link.' + details;
+    return 'Could not start recording. Check your microphone and try again.' + details;
   }
   function showError(msg) { errorBox.textContent = msg; errorBox.style.display = 'block'; }
   function hideError() { errorBox.style.display = 'none'; errorBox.textContent = ''; }
